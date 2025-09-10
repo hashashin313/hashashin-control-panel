@@ -1,0 +1,39 @@
+   name: Build Android APK
+
+   on:
+     push:
+       branches: [ main ]
+     pull_request:
+       branches: [ main ]
+     workflow_dispatch:
+
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       
+       steps:
+       - uses: actions/checkout@v4
+       
+       - name: Set up Python
+         uses: actions/setup-python@v4
+         with:
+           python-version: '3.11'
+       
+       - name: Install system dependencies
+         run: |
+           sudo apt update
+           sudo apt install -y git zip unzip openjdk-11-jdk python3-pip libffi-dev libssl-dev libsqlite3-dev zlib1g-dev
+       
+       - name: Install Python dependencies
+         run: |
+           pip install buildozer cython
+       
+       - name: Build APK
+         run: |
+           buildozer -v android debug
+       
+       - name: Upload APK
+         uses: actions/upload-artifact@v4
+         with:
+           name: hashashin-apk
+           path: bin/*.apk
