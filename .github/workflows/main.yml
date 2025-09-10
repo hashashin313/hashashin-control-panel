@@ -1,4 +1,3 @@
-
 name: Build Android APK
 
 on:
@@ -24,14 +23,37 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt update
-        sudo apt install -y git zip unzip openjdk-11-jdk python3-pip libffi-dev libssl-dev libsqlite3-dev zlib1g-dev
+        sudo apt install -y \
+          build-essential ccache pkg-config git zip unzip curl rsync \
+          openjdk-11-jdk \
+          libffi-dev libssl-dev libsqlite3-dev zlib1g-dev liblzma-dev \
+          libgl1-mesa-dev libgles2-mesa-dev \
+          python3-dev python3-setuptools python3-wheel
 
-    - name: Install Python dependencies
+    - name: Upgrade pip and install Python deps
       run: |
-        pip install --upgrade pip
-        pip install buildozer cython
+        python -m pip install --upgrade pip setuptools wheel
+        pip install --upgrade Cython==0.29.36 buildozer==1.5.0 sh==2.0.6 virtualenv==20.26.6
 
+    # بار اول: اجازه بده SDK/NDK دانلود شود (ممکن است fail شود)
+    - name: Bootstrap SDK/NDK download (may fail)
+      continue-on-error: true
+      env:
+        BUILDOZER_WARN_ON_ROOT: "0"
+      run: |
+        buildozer -v android debug
+
+    # پذیرش غیرتعاملی لایسنس‌ها و نصب ابزارهای پایدار SDK داخل SDKی که buildozer دانلود کرده
+    - name: Accept Android SDK licenses and install stable build-tools
+      run: |
+        SDK_ROOT="$HOME/.buildozer/android/platform/android-sdk"
+        yes | "$SDK_ROOT/tools/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses
+        "$SDK_ROOT/tools/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "build-tools;33.0.2" "platforms;android-33"
+
+    # بیلد نهایی
     - name: Build APK
+      env:
+        BUILDOZER_WARN_ON_ROOT: "0"
       run: |
         buildozer -v android debug
 
