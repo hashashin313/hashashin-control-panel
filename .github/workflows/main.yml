@@ -20,7 +20,7 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install system dependencies
+    - name: Install system deps
       run: |
         sudo apt update
         sudo apt install -y \
@@ -35,30 +35,40 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install --upgrade Cython==0.29.36 buildozer==1.5.0 sh==2.0.6 virtualenv==20.26.6
 
-    # بار اول: اجازه بده SDK/NDK دانلود شود (ممکن است fail شود)
     - name: Bootstrap SDK/NDK download (may fail)
+      env: { BUILDOZER_WARN_ON_ROOT: "0" }
       continue-on-error: true
-      env:
-        BUILDOZER_WARN_ON_ROOT: "0"
-      run: |
-        buildozer -v android debug
+      run: buildozer -v android debug
 
-    # پذیرش غیرتعاملی لایسنس‌ها و نصب ابزارهای پایدار SDK داخل SDKی که buildozer دانلود کرده
-    - name: Accept Android SDK licenses and install stable build-tools
+    - name: Install cmdline-tools and accept licenses
       run: |
-        SDK_ROOT="$HOME/.buildozer/android/platform/android-sdk"
-        yes | "$SDK_ROOT/tools/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses
-        "$SDK_ROOT/tools/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "build-tools;33.0.2" "platforms;android-33"
+        SDK="$HOME/.buildozer/android/platform/android-sdk"
+        mkdir -p "$SDK/cmdline-tools"
+        curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/clt.zip
+        rm -rf "$SDK/cmdline-tools/latest"
+        mkdir -p "$SDK/cmdline-tools/latest"
+        unzip -q /tmp/clt.zip -d "$SDK/cmdline-tools/latest"
+        yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses
+        "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" \
+          "platform-tools" "build-tools;33.0.2" "platforms;android-33"
 
-    # بیلد نهایی
     - name: Build APK
-      env:
-        BUILDOZER_WARN_ON_ROOT: "0"
-      run: |
-        buildozer -v android debug
+      env: { BUILDOZER_WARN_ON_ROOT: "0" }
+      run: buildozer -v android debug
 
-    - name: Upload APK artifact
+    - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392
       with:
         name: hashashin-apk
         path: bin/*.apk
+
+    - name: Upload logs on failure
+      if: failure()
+      uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392
+      with:
+        name: buildozer-logs
+        path: |
+          .buildozer/android/platform/android-sdk/**/*
+          .buildozer/android/platform/android-ndk-*/**/*
+          .buildozer/log/*
